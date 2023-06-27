@@ -1,0 +1,37 @@
+repos:
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: https://github.com/pycqa/autoflake
+    rev: v2.1.1
+    hooks:
+      - id: autoflake
+        name: Removes unused variables
+        args:
+          - --in-place
+          - --remove-all-unused-imports
+          - --ignore-init-module-imports
+
+  - repo: https://github.com/psf/black
+    rev: 23.3.0
+    hooks:
+      - id: black
+        name: Fixes formatting
+        language_version: python3
+        args: ["--line-length=99"]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+        name: Checks pep8 style
+        args: [
+          # line length is handled by black
+          "--ignore=E501,W503",
+          # ignore unused imports in init files
+          "--per-file-ignores=*/__init__.py:F401",
+        ]

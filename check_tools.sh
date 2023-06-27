@@ -1,0 +1,6 @@
+[ -z "$(which blabber_sd)" ] && echo "MoKa is missing in PATH"
+[ -z "$(which conformator)" ] && echo "Conformator is missing in PATH"
+[ -z "$(which xtb)" ] && echo "xTB is missing in PATH"
+[ -z "$(which x2t)" ] && echo "Turbomole binary x2t is missing in PATH"
+[ -z "$(which ridft)" ] && echo "Turbomole binary ridft is missing in PATH"
+[ -z "$(which mpshift)" ] && echo "Turbomole binary mpshift is missing in PATH"

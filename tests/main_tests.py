@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 
 import pandas as pd
-from rdkit.Chem import SDMolSupplier, SDWriter
+from rdkit import Chem
+from rdkit.Chem import SDMolSupplier, SDWriter, SmilesParserParams
 
 from lefqm import constants
 from lefqm.__main__ import get_args, call_subtool
@@ -110,6 +111,12 @@ class MainTests(unittest.TestCase):
             call_subtool(args)
             shieldings = pd.read_csv(output_path)
             self.assertEqual(len(mols), len(shieldings))
+
+            params = SmilesParserParams()
+            params.removeHs = False
+            for _, row in shieldings.iterrows():
+                mol = Chem.MolFromSmiles(row["SMILES"], params)
+                self.assertEqual(mol.GetAtomWithIdx(row["Atom Index"]).GetSymbol(), "F")
 
     def test_shifts(self):
         """Test shift conversion"""

@@ -2,8 +2,10 @@
 import logging
 from pathlib import Path
 
+from lefshift.utils import map_atom_indexes
 import pandas as pd
-from rdkit.Chem import SDMolSupplier
+from rdkit import Chem
+from rdkit.Chem import SDMolSupplier, SmilesParserParams
 
 from lefqm import constants, utils
 
@@ -81,8 +83,13 @@ def ensembles(args):
         calculated_shieldings.append((ensemble[0], fluorine_shieldings))
 
     lines = []
+    params = SmilesParserParams()
+    params.removeHs = False
     for mol, shieldings in calculated_shieldings:
         name = mol.GetProp("_Name")
+        smiles = Chem.MolToSmiles(mol)
+        canon_mol = Chem.MolFromSmiles(smiles, params)
+        atom_index_map = map_atom_indexes(mol, canon_mol)
         for key, shielding in shieldings.items():
             if isinstance(key, tuple):
                 if len(key) == 2:
@@ -95,11 +102,13 @@ def ensembles(args):
                 key = key[0]
             else:
                 label = "CF"
-            lines.append([name, label, key, shielding])
+
+            lines.append([name, smiles, label, atom_index_map[key], shielding])
     output = pd.DataFrame(
         lines,
         columns=[
             constants.ID_COLUMN,
+            constants.SMILES_COLUMN,
             constants.LABEL_COLUMN,
             constants.ATOM_INDEX_COLUMN,
             constants.SHIELDING_COLUMN,

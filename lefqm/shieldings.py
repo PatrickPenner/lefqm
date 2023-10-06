@@ -1,5 +1,4 @@
 """Shielding generation"""
-import configparser
 import logging
 import shutil
 import subprocess
@@ -9,7 +8,8 @@ from pathlib import Path
 from rdkit import Chem
 from rdkit.Chem import SDMolSupplier, SDWriter, rdmolops
 
-from lefqm import constants
+from lefqm import constants, utils
+from lefqm.commandline_calculation import CommandlineCalculation
 
 X2T = "x2t"
 RIDFT = "ridft"
@@ -55,20 +55,8 @@ def add_shieldings_subparser(subparsers):
     )
 
 
-class ShieldingCalculation:
+class ShieldingCalculation(CommandlineCalculation):
     """NMR shielding constant calculation"""
-
-    def __init__(self, config, run_dir_path=None):
-        self.config = config
-        self.run_dir_path = run_dir_path
-        self.tmp_dir = None
-        if self.run_dir_path is None:
-            self.tmp_dir = tempfile.TemporaryDirectory()
-            self.run_dir_path = Path(self.tmp_dir.name)
-
-    def __del__(self):
-        if self.tmp_dir is not None:
-            self.tmp_dir.cleanup()
 
     def run(self, mol):
         """Run shielding calculation
@@ -110,6 +98,8 @@ class ShieldingCalculation:
         :type mpshift: str
         :param cores: maximum number of cores to use
         :type cores: int
+        :param run_dir_path: path to the directory to run in
+        :type run_dir_path: pathlib.Path
         :return: shieldings for every atom
         :rtype: list[float]
         """
@@ -207,10 +197,9 @@ class ShieldingCalculation:
 
 def shieldings(args):
     """Shielding generation"""
-    config = configparser.ConfigParser()
-    config.read(args.config)
-    config = {**config._sections["Paths"], **config._sections["Workflow"]}
+    config = utils.config_to_dict(args.config)
     config["cores"] = args.cores
+
     writer = SDWriter(str(args.output))
     for index, mol in enumerate(SDMolSupplier(str(args.input), removeHs=False)):
         mol_name = mol.GetProp("_Name") if mol.HasProp("_Name") else str(index)

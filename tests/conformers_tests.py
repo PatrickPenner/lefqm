@@ -1,13 +1,15 @@
 """Conformer generation tests"""
 import math
 import unittest
+from pathlib import Path
 
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import rdMolAlign, rdmolops
 
+from lefqm import utils
 from lefqm.conformers import (
-    generate,
+    ConformerGeneration,
     normalize,
     optimize,
     optimize_conformation,
@@ -16,8 +18,26 @@ from lefqm.conformers import (
 )
 
 
-class ConformersTests(unittest.TestCase):
+class ConformerGenerationTests(unittest.TestCase):
     """Conformer generation tests"""
+
+    def test_run(self):
+        """Test running conformer generation"""
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.config_to_dict(config_path)
+        mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
+        mol = ConformerGeneration(config).run(mol)
+        self.assertEqual(mol.GetNumConformers(), 159)
+
+    def test_conformator_generate(self):
+        """Test conformer generation"""
+        mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
+        mol = ConformerGeneration.conformator_generate(mol)
+        self.assertEqual(mol.GetNumConformers(), 159)
+
+
+class ConformersTests(unittest.TestCase):
+    """Conformers tests"""
 
     def test_normalize(self):
         """Test molecule normalization"""
@@ -50,16 +70,10 @@ class ConformersTests(unittest.TestCase):
         mol = protonate(mol)
         self.assertEqual(rdmolops.GetFormalCharge(mol), -1)
 
-    def test_generate(self):
-        """Test conformer generation"""
-        mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
-        mol = generate(mol)
-        self.assertEqual(mol.GetNumConformers(), 159)
-
     def test_rmsd_cluster(self):
         """Test rmsd clustering"""
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
-        mol = generate(mol)
+        mol = ConformerGeneration.conformator_generate(mol)
         nof_conformations = mol.GetNumConformers()
         # fake energies
         conformation_energies = range(nof_conformations)
@@ -71,7 +85,7 @@ class ConformersTests(unittest.TestCase):
     def test_optimize_conformation(self):
         """Test optimizing a single conformation"""
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
-        mol = generate(mol)
+        mol = ConformerGeneration.conformator_generate(mol)
         for i in range(1, mol.GetNumConformers()):
             mol.RemoveConformer(i)
         optimized_conformation, energy = optimize_conformation(mol, 0, cores=1)
@@ -87,7 +101,7 @@ class ConformersTests(unittest.TestCase):
     def test_optimize(self):
         """Test optimization by XTB"""
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
-        mol = generate(mol)
+        mol = ConformerGeneration.conformator_generate(mol)
         conformation_indexes = [0, 1]
         optimized_mol, energies = optimize(mol, conformation_indexes, cores=1)
 

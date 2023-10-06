@@ -1,7 +1,7 @@
 """Test registration"""
 import logging
 
-from .conformers_tests import ConformersTests
+from .conformers_tests import ConformerGenerationTests, ConformersTests
 from .shieldings_tests import ShieldingCalculationTests
 from .utils_tests import UtilsTests
 from .main_tests import MainTests

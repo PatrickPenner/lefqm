@@ -16,6 +16,7 @@ from rdkit.Chem.SaltRemover import SaltRemover
 from scipy.cluster.hierarchy import fcluster, linkage
 
 from lefqm import constants, utils
+from lefqm.commandline_calculation import CommandlineCalculation
 
 CONFORMATOR = "conformator"
 XTB = "xtb"
@@ -69,6 +70,12 @@ def add_conformers_subparser(subparsers):
     )
     conformers_parser.add_argument(
         "-v", "--verbose", help="show verbose output", action="store_true"
+    )
+    conformers_parser.add_argument(
+        "--config",
+        type=Path,
+        help="Config file to read from",
+        default=Path(__file__).absolute().parent / "config.ini",
     )
 
 
@@ -141,7 +148,13 @@ def normalize(mol):
     :return: normalized mol
     :rtype: rdkit.Chem.rdchem.Mol
     """
-    mol = SaltRemover().StripMol(mol)
+    stripped_mol = SaltRemover().StripMol(mol)
+    if stripped_mol.GetNumAtoms() == 0:
+        logging.warning(
+            'Salt strippper removed entire molecule "%s", keeping original', mol.GetProp("_Name")
+        )
+    else:
+        mol = stripped_mol
     if rdmolops.GetFormalCharge(mol) != 0:
         mol = rdMolStandardize.ChargeParent(mol)
         Chem.SanitizeMol(mol)
@@ -238,62 +251,85 @@ def protonate(mol, ph=7.6, min_abundance=90):
     return mols[0]
 
 
-def generate(mol):
-    """Generate conformations for a molecule using the conformator
+class ConformerGeneration(CommandlineCalculation):
+    """Conformer generation"""
 
-    Conformator commandline interface:
+    def run(self, mol):
+        """Run conformer generation
 
-        Calculates conformations for the molecules in the input file:
+        :param mol: molecule to run the generation for
+        :type mol: rdkit.Chem.rdchem.Mol
+        :return: mol with conformations
+        :rtype: rdkit.Chem.rdchem.Mol
+        """
+        if self.config["confgen_method"] == "conformator":
+            return self.conformator_generate(mol, run_dir_path=self.run_dir_path)
+        raise RuntimeError("Invalid QM method")
 
-        Options:
-         -h [ --help ]                  Prints help message
-         -v [ --verbosity ] arg (=3)    Set verbosity level
-                                        (0 = Quiet, 1 = One-line-summary, 2 = Errors,
-                                        3 = Warnings, 4 = Info)
-         -i [ --input ] arg             Input file, suffix is required.
-         -o [ --output ] arg            Output file, suffix is required.
-         -q [ --quality ] arg (=2)      Set quality level
-                                        (1 = Fast, 2 = Best)
-         -n [ --nOfConfs ] arg (=250)   Set maximum number of conformations to be
-                                        generated.
-         -f [ --from ] arg (=1)         Position of first entry in the calculation.
-         -t [ --to ] arg (=4294967295)  Position of last entry in the calculation.
-         --keep3d                       Keep initial 3D coordinates for molecule as
-                                        starting point for conformation generation.
-         --hydrogens                    Consider hydrogen clashes during conformation
-                                        generation.
-         --macrocycle_size arg (=10)    Define minimum size of macrocycles (<= 10)
-         --rmsd_input                   Calculate the minimum RMSD of the closest
-                                        ensemble member to the input structure.
-         --rmsd_ensemble                Calculate the minimum RMSD of the closest
-                                        ensemble members to each other.
+    @staticmethod
+    def conformator_generate(mol, conformator="conformator", run_dir_path=None):
+        """Generate conformations for a molecule using the conformator
 
-        License:
-         --license arg                  To reactivate the executable, please provide a
-                                        new license key.
+        Conformator commandline interface:
 
-    :param mol: mol to generate conformations for
-    :type mol: rdkit.Chem.rdchem.Mol
-    :return: mol with conformations
-    :rtype: rdkit.Chem.rdchem.Mol
-    """
-    if not shutil.which(CONFORMATOR):
-        raise RuntimeError(f"Cannot find {CONFORMATOR}")
+            Calculates conformations for the molecules in the input file:
 
-    with tempfile.TemporaryDirectory() as conformator_dir:
-        conformator_dir = Path(conformator_dir)
-        logging.debug("Generating conformers in: %s", conformator_dir)
+            Options:
+             -h [ --help ]                  Prints help message
+             -v [ --verbosity ] arg (=3)    Set verbosity level
+                                            (0 = Quiet, 1 = One-line-summary, 2 = Errors,
+                                            3 = Warnings, 4 = Info)
+             -i [ --input ] arg             Input file, suffix is required.
+             -o [ --output ] arg            Output file, suffix is required.
+             -q [ --quality ] arg (=2)      Set quality level
+                                            (1 = Fast, 2 = Best)
+             -n [ --nOfConfs ] arg (=250)   Set maximum number of conformations to be
+                                            generated.
+             -f [ --from ] arg (=1)         Position of first entry in the calculation.
+             -t [ --to ] arg (=4294967295)  Position of last entry in the calculation.
+             --keep3d                       Keep initial 3D coordinates for molecule as
+                                            starting point for conformation generation.
+             --hydrogens                    Consider hydrogen clashes during conformation
+                                            generation.
+             --macrocycle_size arg (=10)    Define minimum size of macrocycles (<= 10)
+             --rmsd_input                   Calculate the minimum RMSD of the closest
+                                            ensemble member to the input structure.
+             --rmsd_ensemble                Calculate the minimum RMSD of the closest
+                                            ensemble members to each other.
 
-        input_file_path = conformator_dir / "input.smi"
+            License:
+             --license arg                  To reactivate the executable, please provide a
+                                            new license key.
+
+        :param mol: mol to generate conformations for
+        :type mol: rdkit.Chem.rdchem.Mol
+        :param conformator: path/call to conformator
+        :type conformator: str
+        :param run_dir_path: path to the directory to run in
+        :type run_dir_path: pathlib.Path
+        :return: mol with conformations
+        :rtype: rdkit.Chem.rdchem.Mol
+        """
+        if not shutil.which(conformator):
+            raise RuntimeError(f"Cannot find {conformator}")
+
+        tmp_dir = None
+        if run_dir_path is None:
+            tmp_dir = tempfile.TemporaryDirectory()
+            run_dir_path = Path(tmp_dir.name)
+
+        logging.debug("Generating conformers in: %s", run_dir_path)
+
+        input_file_path = run_dir_path / "input.smi"
         with open(input_file_path, "w", encoding="utf8") as input_file:
             input_file.write(Chem.MolToSmiles(mol) + " " + mol.GetProp("_Name"))
 
-        output_file_path = conformator_dir / "output.sdf"
+        output_file_path = run_dir_path / "output.sdf"
         logging.debug("Output file is: %s", output_file_path)
 
         shell_output = subprocess.check_output(
             [
-                CONFORMATOR,
+                conformator,
                 "-i",
                 str(input_file_path),
                 "-o",
@@ -317,7 +353,10 @@ def generate(mol):
         for conformer_mol in mols[1:]:
             mol.AddConformer(conformer_mol.GetConformer(0), assignId=True)
         logging.info("Generated %s conformations", mol.GetNumConformers())
-    return mol
+
+        if tmp_dir is not None:
+            tmp_dir.cleanup()
+        return mol
 
 
 def prune_conformations(mol, prune_threshold):
@@ -494,6 +533,9 @@ def optimize(mol, conformation_indexes=None, cores=None):
 
 def conformers(args):
     """Generate representative conformations"""
+    config = utils.config_to_dict(args.config)
+    config["cores"] = args.cores
+
     if args.input.suffix not in {".smi", ".csv"}:
         raise RuntimeError("Input may only be a SMILES (.smi) or a CSV (.csv)")
 
@@ -511,7 +553,7 @@ def conformers(args):
 
             mol = normalize(mol)
             mol = protonate(mol)
-            mol = generate(mol)
+            mol = ConformerGeneration(config).run(mol)
 
             # optimization
             mol, energies = optimize(mol, cores=args.cores)

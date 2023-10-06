@@ -1,4 +1,5 @@
 """QM utils"""
+import configparser
 import copy
 import itertools
 import math
@@ -204,3 +205,10 @@ def get_lowest_energy_fluorine_shieldings(
             return get_fluorine_shieldings(mol, shielding_property=shielding_property)
 
     return None
+
+
+def config_to_dict(config_file_path):
+    """Read a config file into a dict"""
+    config = configparser.ConfigParser()
+    config.read(config_file_path)
+    return {**config._sections["Paths"], **config._sections["Workflow"]}

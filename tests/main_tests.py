@@ -72,6 +72,7 @@ class MainTests(unittest.TestCase):
             input_path = tmp_path / "input.sdf"
             output_path = tmp_path / "output_shieldings.sdf"
             writer = SDWriter(str(input_path))
+            writer.SetForceV3000(True)
             writer.write(mol)
             writer.close()
             args = get_args(
@@ -98,6 +99,7 @@ class MainTests(unittest.TestCase):
             mols = list(SDMolSupplier("tests/data/mols_with_shieldings.sdf", removeHs=False))
             for mol in mols:
                 writer = SDWriter(str(input_path / (mol.GetProp("_Name") + ".sdf")))
+                writer.SetForceV3000(True)
                 writer.write(mol)
                 writer.close()
             output_path = tmp_path / "shieldings.csv"

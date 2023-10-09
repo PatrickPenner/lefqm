@@ -36,6 +36,7 @@ def shieldings(args):
     config["cores"] = args.cores
 
     writer = SDWriter(str(args.output))
+    writer.SetForceV3000(True)
     for index, mol in enumerate(SDMolSupplier(str(args.input), removeHs=False)):
         mol_name = mol.GetProp("_Name") if mol.HasProp("_Name") else str(index)
         try:

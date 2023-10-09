@@ -147,6 +147,7 @@ def moka_protonate(mol, moka="blabber_sd", ph=7.6, min_abundance=90):
 
         input_file_path = moka_dir / "input.sdf"
         writer = SDWriter(str(input_file_path))
+        writer.SetForceV3000(True)
         writer.write(mol)
         writer.close()
 
@@ -348,6 +349,7 @@ def omega_generate(
 
     input_file_path = run_dir_path / "input.sdf"
     writer = SDWriter(str(input_file_path))
+    writer.SetForceV3000(True)
     writer.write(mol)
     writer.close()
 

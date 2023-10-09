@@ -270,6 +270,7 @@ def conformers(args):
             )
 
             writer = SDWriter(str(args.output / (mol.GetProp("_Name") + ".sdf")))
+            writer.SetForceV3000(True)
             conformation_energies = [energies[index] for index in conformation_indexes]
             boltzmann_weights = utils.get_boltzmann_weights(np.array(conformation_energies))
             for conformer_id, energy, weight in zip(

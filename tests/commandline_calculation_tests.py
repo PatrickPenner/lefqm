@@ -15,6 +15,8 @@ from lefqm.commandline_calculation import (
     xtb_optimize_conformation,
     xtb_optimize,
     turbomole_calculate_shieldings,
+    nwchem_calculate_shieldings,
+    nwchem_read_isotropic_shieldings,
     ConformerGeneration,
     ShieldingCalculation,
 )
@@ -93,13 +95,27 @@ class CommandlineCalculationTests(unittest.TestCase):
         )
 
     def test_turbomole_calculate_shieldings(self):
-        """Test shielidng generation with turbomole"""
-        mol = list(SDMolSupplier("tests/data/mols_with_shieldings.sdf", removeHs=False))[0]
+        """Test shielding generation with turbomole"""
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         shieldings = turbomole_calculate_shieldings(mol, cores=1)
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
-                shieldings[index], atom.GetDoubleProp(constants.SHIELDING_SD_PROPERTY)
+                shieldings[index],
+                atom.GetDoubleProp("turbomole " + constants.SHIELDING_SD_PROPERTY),
             )
+
+    def test_nwchem_calculate_shieldings(self):
+        """Test shielding generation with nwchem"""
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        shieldings = nwchem_calculate_shieldings(mol)
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index], atom.GetDoubleProp("nwchem " + constants.SHIELDING_SD_PROPERTY)
+            )
+
+    def test_nwchem_read_isotropic_shieldings(self):
+        """Read isotropic shieldings"""
+        nwchem_read_isotropic_shieldings("tests/data/shielding.log")
 
 
 class ConformerGenerationTests(unittest.TestCase):
@@ -130,12 +146,23 @@ class ShieldingCalculationTests(unittest.TestCase):
 
     def test_run(self):
         """Test shielidng generation"""
-        mol = list(SDMolSupplier("tests/data/mols_with_shieldings.sdf", removeHs=False))[0]
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
         config = utils.config_to_dict(config_path)
         config["cores"] = 1
+
+        config["qm_method"] = "turbomole"
         shieldings = ShieldingCalculation(config).run(mol)
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
-                shieldings[index], atom.GetDoubleProp(constants.SHIELDING_SD_PROPERTY)
+                shieldings[index],
+                atom.GetDoubleProp("turbomole " + constants.SHIELDING_SD_PROPERTY),
+            )
+
+        config["qm_method"] = "nwchem"
+        shieldings = ShieldingCalculation(config).run(mol)
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index],
+                atom.GetDoubleProp("nwchem " + constants.SHIELDING_SD_PROPERTY),
             )

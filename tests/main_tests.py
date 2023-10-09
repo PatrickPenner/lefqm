@@ -68,7 +68,7 @@ class MainTests(unittest.TestCase):
         """Test shieldings"""
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            mol = list(SDMolSupplier("tests/data/mols_with_shieldings.sdf", removeHs=False))[0]
+            mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
             input_path = tmp_path / "input.sdf"
             output_path = tmp_path / "output_shieldings.sdf"
             writer = SDWriter(str(input_path))

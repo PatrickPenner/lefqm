@@ -1,46 +1,19 @@
 """Generate representative conformations"""
 import logging
-import shutil
-import subprocess
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from lefshift.application_utils import validate_column
 from rdkit import Chem
-from rdkit.Chem import AllChem, SDMolSupplier, SDWriter, StereoSpecified, rdmolops
+from rdkit.Chem import AllChem, SDWriter, StereoSpecified, rdmolops
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.SaltRemover import SaltRemover
 from scipy.cluster.hierarchy import fcluster, linkage
 
 from lefqm import constants, utils
-from lefqm.commandline_calculation import CommandlineCalculation
-
-CONFORMATOR = "conformator"
-XTB = "xtb"
-MOKA = "blabber_sd"
-
-XTB_DEFAULT = {
-    "gfn": 2,
-    "alpb": "water",
-    "opt": None,
-    "cycles": 100,
-}
-
-XTB_FAST = {
-    "gfn": 0,
-    "alpb": "water",
-    "opt": None,
-    "cycles": 200,
-}
-
-XTB_LAX = {
-    "gfn": 2,
-    "alpb": "water",
-    "opt": "lax",
-}
+from lefqm.commandline_calculation import ConformerGeneration, moka_protonate, xtb_optimize
 
 
 def add_conformers_subparser(subparsers):
@@ -175,190 +148,6 @@ def normalize(mol):
     return mol
 
 
-def protonate(mol, ph=7.6, min_abundance=90):
-    """Protonate molecule
-
-    Assign the most abundant tautomer/protomer. MoKa commandline interface:
-
-        usage: /usr/prog/MoKa/4.0.1/blabber_sd.bin [options] <filename>
-
-         <filename> can be a SD (.sd or .sdf) or MOL2 (.mol2) file
-
-        options are:
-         -h, --help                     display this help
-             --version                  show version info
-             --input-type=<sd|mol2|smi> input file type (autodetect)
-         -p <pH list>, --pH=<pH list>   report most abundant species
-                                        at given pH (7.4)
-         -n, --neutralize               report only the neutral species
-             --load-model=<database>    use a custom model database for predictions
-         -o, --output=FILE              output file name (SD only)
-         -m, --minimize                 perform full 3D minimization
-         -t <abundance>                 report all species above the threshold
-         -e, --equivalent-protomers     generate all equivalent protomers
-
-        <pH list> is a comma separated list of the following:
-            * single value
-            * range ( min-max )
-
-    :param mol: mol to generate tautomers/protomers for
-    :type mol: rdkit.Chem.rdchem.Mol
-    :param ph: pH for protonation
-    :type ph: float
-    :param min_abundance: cutoff in percent for protomer abundance
-    :type min_abundance: int
-    :return: protonated mol
-    :rtype: rdkit.Chem.rdchem.Mol
-    """
-    if not shutil.which(MOKA):
-        raise RuntimeError(f"Cannot find {MOKA}")
-
-    with tempfile.TemporaryDirectory() as moka_dir:
-        moka_dir = Path(moka_dir)
-        logging.debug("Generating tautomers/protomers in: %s", moka_dir)
-
-        input_file_path = moka_dir / "input.sdf"
-        writer = SDWriter(str(input_file_path))
-        writer.write(mol)
-        writer.close()
-
-        output_file_path = moka_dir / "output.sdf"
-        logging.debug("Output file is: %s", output_file_path)
-
-        command = [
-            MOKA,
-            str(input_file_path),
-            "-o",
-            str(output_file_path),
-            "-p",
-            str(ph),
-            "-t",
-            str(min_abundance),
-        ]
-        logging.debug(" ".join(command))
-        shell_output = subprocess.check_output(command, stderr=subprocess.STDOUT)
-        if shell_output:
-            logging.debug(shell_output)
-
-        mols = SDMolSupplier(str(output_file_path), removeHs=False)
-        if len(mols) == 1 and mols[0].GetProp("ABUNDANCE") == "No species found":
-            logging.debug("MoKa found no protomers, returning original")
-            return mol
-
-        mols = sorted(
-            mols, key=lambda mol: float(mol.GetProp("ABUNDANCE").split("%")[0]), reverse=True
-        )
-    return mols[0]
-
-
-class ConformerGeneration(CommandlineCalculation):
-    """Conformer generation"""
-
-    def run(self, mol):
-        """Run conformer generation
-
-        :param mol: molecule to run the generation for
-        :type mol: rdkit.Chem.rdchem.Mol
-        :return: mol with conformations
-        :rtype: rdkit.Chem.rdchem.Mol
-        """
-        if self.config["confgen_method"] == "conformator":
-            return self.conformator_generate(mol, run_dir_path=self.run_dir_path)
-        raise RuntimeError("Invalid QM method")
-
-    @staticmethod
-    def conformator_generate(mol, conformator="conformator", run_dir_path=None):
-        """Generate conformations for a molecule using the conformator
-
-        Conformator commandline interface:
-
-            Calculates conformations for the molecules in the input file:
-
-            Options:
-             -h [ --help ]                  Prints help message
-             -v [ --verbosity ] arg (=3)    Set verbosity level
-                                            (0 = Quiet, 1 = One-line-summary, 2 = Errors,
-                                            3 = Warnings, 4 = Info)
-             -i [ --input ] arg             Input file, suffix is required.
-             -o [ --output ] arg            Output file, suffix is required.
-             -q [ --quality ] arg (=2)      Set quality level
-                                            (1 = Fast, 2 = Best)
-             -n [ --nOfConfs ] arg (=250)   Set maximum number of conformations to be
-                                            generated.
-             -f [ --from ] arg (=1)         Position of first entry in the calculation.
-             -t [ --to ] arg (=4294967295)  Position of last entry in the calculation.
-             --keep3d                       Keep initial 3D coordinates for molecule as
-                                            starting point for conformation generation.
-             --hydrogens                    Consider hydrogen clashes during conformation
-                                            generation.
-             --macrocycle_size arg (=10)    Define minimum size of macrocycles (<= 10)
-             --rmsd_input                   Calculate the minimum RMSD of the closest
-                                            ensemble member to the input structure.
-             --rmsd_ensemble                Calculate the minimum RMSD of the closest
-                                            ensemble members to each other.
-
-            License:
-             --license arg                  To reactivate the executable, please provide a
-                                            new license key.
-
-        :param mol: mol to generate conformations for
-        :type mol: rdkit.Chem.rdchem.Mol
-        :param conformator: path/call to conformator
-        :type conformator: str
-        :param run_dir_path: path to the directory to run in
-        :type run_dir_path: pathlib.Path
-        :return: mol with conformations
-        :rtype: rdkit.Chem.rdchem.Mol
-        """
-        if not shutil.which(conformator):
-            raise RuntimeError(f"Cannot find {conformator}")
-
-        tmp_dir = None
-        if run_dir_path is None:
-            tmp_dir = tempfile.TemporaryDirectory()
-            run_dir_path = Path(tmp_dir.name)
-
-        logging.debug("Generating conformers in: %s", run_dir_path)
-
-        input_file_path = run_dir_path / "input.smi"
-        with open(input_file_path, "w", encoding="utf8") as input_file:
-            input_file.write(Chem.MolToSmiles(mol) + " " + mol.GetProp("_Name"))
-
-        output_file_path = run_dir_path / "output.sdf"
-        logging.debug("Output file is: %s", output_file_path)
-
-        shell_output = subprocess.check_output(
-            [
-                conformator,
-                "-i",
-                str(input_file_path),
-                "-o",
-                str(output_file_path),
-            ],
-            stderr=subprocess.STDOUT,
-        )
-        if shell_output:
-            logging.debug(shell_output)
-        if (
-            bytes("INPUT", encoding="ascii") not in shell_output
-            and bytes("NONE", encoding="ascii") not in shell_output
-            and bytes("PURE", encoding="ascii") not in shell_output
-        ):
-            logging.warning("Detected potential undefined stereo")
-        if not output_file_path.exists():
-            raise RuntimeError("Did not generate conformations")
-
-        mols = list(SDMolSupplier(str(output_file_path), removeHs=False))
-        mol = mols[0]
-        for conformer_mol in mols[1:]:
-            mol.AddConformer(conformer_mol.GetConformer(0), assignId=True)
-        logging.info("Generated %s conformations", mol.GetNumConformers())
-
-        if tmp_dir is not None:
-            tmp_dir.cleanup()
-        return mol
-
-
 def prune_conformations(mol, prune_threshold):
     """Prune duplicated conformations
 
@@ -444,93 +233,6 @@ def rmsd_cluster(
     return [conformer_ids[pick] for pick in cluster_picks]
 
 
-def optimize_conformation(mol, conformation_index, cores=None):
-    """Optimize a conformation with XTB
-
-    :param mol: molecule with conformations to optimize
-    :type mol: rdkit.Chem.rdchem.Mol
-    :param conformation_index: index of the conformation to optimize
-    :type conformation_index: int
-    :return: optimized conformation and XTB conformer energy in hartrees
-    :rtype: (rdkit.Chem.rdchem.Conformer, float)
-    """
-    if not shutil.which(CONFORMATOR):
-        raise RuntimeError(f"Cannot find {XTB}")
-
-    with tempfile.TemporaryDirectory() as xtb_dir:
-        logging.debug("Optimizing conformers in: %s", xtb_dir)
-        xtb_dir = Path(xtb_dir)
-        charge = rdmolops.GetFormalCharge(mol)
-        with open(xtb_dir / ".CHRG", "w", encoding="utf8") as charge_file:
-            charge_file.write(str(charge))
-
-        input_file_path = xtb_dir / "input.xyz"
-        with open(input_file_path, "w", encoding="utf8") as input_file:
-            input_file.write(Chem.MolToXYZBlock(mol, confId=conformation_index))
-
-        command = [XTB, input_file_path.name]
-        for option, value in XTB_DEFAULT.items():
-            command.append(f"--{option}")
-            if value is not None:
-                command.append(str(value))
-
-        if cores:
-            command.extend(["--parallel", str(cores)])
-
-        xtb_log_path = xtb_dir / "xtb.log"
-        with open(xtb_log_path, "w", encoding="utf8") as log_file:
-            logging.debug(" ".join(command))
-            subprocess.check_call(command, cwd=xtb_dir, stdout=log_file, stderr=subprocess.STDOUT)
-
-        with open(xtb_log_path, encoding="utf8") as log_file:
-            lines = list(log_file.readlines())
-            if "finished run on" not in lines[-16]:
-                raise RuntimeError("XTB calculation did not converge")
-
-        with open(xtb_dir / "xtbopt.xyz", encoding="utf8") as optimized_xyz_file:
-            xyz_string = optimized_xyz_file.read()
-
-        comment_line = [
-            token.strip() for token in xyz_string.split("\n")[1].split(" ") if token.strip()
-        ]
-        assert "energy:" == comment_line[0], "Energy was not written with molecule"
-        energy = float(comment_line[1])
-        optimized_mol = Chem.MolFromXYZBlock(xyz_string)
-
-    return optimized_mol.GetConformer(0), energy
-
-
-def optimize(mol, conformation_indexes=None, cores=None):
-    """Optimize the conformations of a molecule with XTB
-
-    :param mol: molecule with conformations to optimize
-    :type mol: rdkit.Chem.rdchem.Mol
-    :return: optimized molecule and XTB conformer energies in kcal/mol
-    :rtype: (rdkit.Chem.rdchem.Mol, list[float])
-    """
-    if conformation_indexes is None:
-        conformation_indexes = range(mol.GetNumConformers())
-
-    optimized_mol = Chem.Mol(mol, True)  # copy without conformers
-    optimized_mol.SetProp("_Name", mol.GetProp("_Name"))
-    energies = []
-    for index, conformation_index in enumerate(conformation_indexes):
-        try:
-            optimized_conformer, energy = optimize_conformation(
-                mol, conformation_index, cores=cores
-            )
-            energies.append(energy * constants.HARTREE_TO_KCALMOL)
-            optimized_mol.AddConformer(optimized_conformer, assignId=True)
-        except RuntimeError as error:
-            logging.warning(
-                "Skipped conformation in molecule %s that encountered error: %s",
-                mol.GetProp("_Name"),
-                error,
-            )
-        logging.info("Optimized %s / %s", index + 1, len(conformation_indexes))
-    return optimized_mol, energies
-
-
 def conformers(args):
     """Generate representative conformations"""
     config = utils.config_to_dict(args.config)
@@ -552,15 +254,19 @@ def conformers(args):
                 mol.SetProp("_Name", smiles)
 
             mol = normalize(mol)
-            mol = protonate(mol)
+            mol = moka_protonate(mol, moka=config["moka"])
             mol = ConformerGeneration(config).run(mol)
 
             # optimization
-            mol, energies = optimize(mol, cores=args.cores)
+            mol, energies = xtb_optimize(mol, xtb=config["xtb"], cores=args.cores)
 
             # RMSD clustering
             conformation_indexes = rmsd_cluster(
-                mol, energies, nof_clusters=args.ensemble_size, nof_picks_cluster=1
+                mol,
+                energies,
+                nof_clusters=args.ensemble_size,
+                nof_picks_cluster=1,
+                prune_threshold=float(config["conf_prune_threshold"]),
             )
 
             writer = SDWriter(str(args.output / (mol.GetProp("_Name") + ".sdf")))

@@ -211,4 +211,8 @@ def config_to_dict(config_file_path):
     """Read a config file into a dict"""
     config = configparser.ConfigParser()
     config.read(config_file_path)
-    return {**config._sections["Paths"], **config._sections["Workflow"]}
+    return {
+        **config._sections["Paths"],
+        **config._sections["Workflow"],
+        **config._sections["Parameters"],
+    }

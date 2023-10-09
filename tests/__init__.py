@@ -1,9 +1,13 @@
 """Test registration"""
 import logging
 
-from .conformers_tests import ConformerGenerationTests, ConformersTests
-from .shieldings_tests import ShieldingCalculationTests
+from .conformers_tests import ConformersTests
 from .utils_tests import UtilsTests
 from .main_tests import MainTests
+from .commandline_calculation_tests import (
+    CommandlineCalculationTests,
+    ConformerGenerationTests,
+    ShieldingCalculationTests,
+)
 
-logging.disable(logging.CRITICAL)  # suppress noise form failure tests
+# logging.disable(logging.CRITICAL)  # suppress noise form failure tests

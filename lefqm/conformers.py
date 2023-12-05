@@ -96,6 +96,12 @@ def get_smiles_chunk(
             str,
             f'Could not find structure column "{smiles_column}" in input. Specify structure column with name "--smiles-column" option.',
         )
+        smiles_data = validate_column(
+            smiles_data,
+            id_column,
+            str,
+            f'Could not find ID column "{id_column}" in input. Specify structure column with name "--id-column" option.',
+        )
         if start_index is not None and end_index is not None:
             smiles_data = smiles_data[start_index:end_index]
         smiles_chunk = list(smiles_data[smiles_column] + " " + smiles_data[id_column])

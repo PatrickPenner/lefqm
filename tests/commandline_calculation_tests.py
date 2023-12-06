@@ -17,6 +17,8 @@ from lefqm.commandline_calculation import (
     turbomole_calculate_shieldings,
     nwchem_calculate_shieldings,
     nwchem_read_isotropic_shieldings,
+    gaussian_calculate_shieldings,
+    gaussian_read_isotropic_shieldings,
     ConformerGeneration,
     ShieldingCalculation,
 )
@@ -115,7 +117,30 @@ class CommandlineCalculationTests(unittest.TestCase):
 
     def test_nwchem_read_isotropic_shieldings(self):
         """Read isotropic shieldings"""
-        nwchem_read_isotropic_shieldings("tests/data/shielding.log")
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        shieldings = nwchem_read_isotropic_shieldings("tests/data/nwchem_shielding.log")
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index], atom.GetDoubleProp("nwchem " + constants.SHIELDING_SD_PROPERTY)
+            )
+
+    def test_gaussian_calculate_shieldings(self):
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        shieldings = gaussian_calculate_shieldings(mol)
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index],
+                atom.GetDoubleProp("gaussian " + constants.SHIELDING_SD_PROPERTY),
+            )
+
+    def test_gaussian_read_isotropic_shieldings(self):
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        shieldings = gaussian_read_isotropic_shieldings("tests/data/g16_shielding.log")
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index],
+                atom.GetDoubleProp("gaussian " + constants.SHIELDING_SD_PROPERTY),
+            )
 
 
 class ConformerGenerationTests(unittest.TestCase):
@@ -144,8 +169,8 @@ class ConformerGenerationTests(unittest.TestCase):
 class ShieldingCalculationTests(unittest.TestCase):
     """Shielding generation tests"""
 
-    def test_run(self):
-        """Test shielidng generation"""
+    def test_run_turbomole(self):
+        """Test turbomole shielidng generation"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
         config = utils.config_to_dict(config_path)
@@ -159,10 +184,32 @@ class ShieldingCalculationTests(unittest.TestCase):
                 atom.GetDoubleProp("turbomole " + constants.SHIELDING_SD_PROPERTY),
             )
 
+    def test_run_nwchem(self):
+        """Test nwchem shielding generation"""
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.config_to_dict(config_path)
+        config["cores"] = 1
+
         config["qm_method"] = "nwchem"
         shieldings = ShieldingCalculation(config).run(mol)
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
                 shieldings[index],
                 atom.GetDoubleProp("nwchem " + constants.SHIELDING_SD_PROPERTY),
+            )
+
+    def test_run_gaussian(self):
+        """Test gaussian shielding generation"""
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.config_to_dict(config_path)
+        config["cores"] = 1
+
+        config["qm_method"] = "gaussian"
+        shieldings = ShieldingCalculation(config).run(mol)
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index],
+                atom.GetDoubleProp("gaussian " + constants.SHIELDING_SD_PROPERTY),
             )

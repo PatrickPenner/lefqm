@@ -29,4 +29,7 @@ M  END
 >  <atom.dprop.nwchem isotropic shielding in water>  (1)
 61.6658 39.0584 49.7953 59.1688 254.7047 253.1 253.1
 
+>  <atom.dprop.gaussian isotropic shielding in water>  (1)
+75.5298 43.0541 62.4627 67.8538 285.1668 281.3981 281.3981
+
 $$$$

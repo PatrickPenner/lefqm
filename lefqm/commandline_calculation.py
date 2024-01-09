@@ -514,7 +514,7 @@ def xtb_optimize(mol, xtb="xtb", conformation_indexes=None, cores=None):
 
 TURBOMOLE_CONTROL = """
 $atoms
-basis=def2-tzvp
+basis=def2-TZVP
 $coord file=coord
 $symmetry c1
 $eht charge={charge}

@@ -2,7 +2,12 @@
 
 ## Getting Started
 
-You can clone the repo manually and then install the lefqm package:
+A PyPi package is available:
+```
+pip install lefqm
+```
+
+You can also clone the repo manually and then install the lefqm package:
 ```
 git clone https://github.com/PatrickPenner/lefqm.git
 cd lefqm
@@ -59,15 +64,46 @@ these tools:
 
 - [MoKa](https://www.moldiscovery.com/software/moka/) - protomerization/tautomerization
 - [Conformator](https://www.zbh.uni-hamburg.de/forschung/amd/software/conformator.html) - conformer generation
+- [Omega](https://www.eyesopen.com/) - conformer generation
 - [xTB](https://xtb-docs.readthedocs.io/en/latest/contents.html) - conformer optimization
 - [Turbomole binaries: x2t, ridft, mpshift](https://www.turbomole.org/) - DFT shielding constant calculations
+- [NWChem](https://nwchemgit.github.io/) - DFT shielding constant calculations
+- [Gaussian](https://gaussian.com/) - DFT shielding constant calculations
 
-The first three are used in the conformer generation and the Turbomole binaries
-are used in the shielding constant calculation. You can check if all these
-tools are available by running the `check_tools.sh` script:
+The above tools are redundant and you may choose between using, for example,
+one of the three QM engines listed above. To configure which tools are supposed
+to run you must pass a config file with `--config` to each commandline call.
+You do not need to specify all parameters, but can only include those you want
+to change. The default configuration can be found in `lefqm/config.ini` and
+looks like this:
+
+```ini
+[Paths]
+moka = blabber_sd
+xtb = xtb
+conformator = conformator
+x2t = x2t
+ridft = ridft
+mpshift = mpshift
+omega = omega2
+nwchem = nwchem
+gaussian = g16
+
+[Workflow]
+; Can be "conformator" / "rdkit" / "omega"
+confgen_method = conformator
+; Can be "turbomole" / "nwchem" / "gaussian"
+qm_method = turbomole
+
+[Parameters]
+max_confs = 250
+; In Angstroem RMSD
+conf_prune_threshold = 0.15
 ```
-./check_tools.sh
-```
+
+Note the `Paths` section in the config file. The strings in that section will
+be the exact commands lefqm will try to run. If these are different in your
+environment, you will need to edit them.
 
 Conformer generation and shielding constant calculation are intentionally
 split from the rest of the workflow. If you do not have the tools available for
@@ -81,13 +117,11 @@ fail if they are not optimized to a QM level. XTB is a great trade-off between
 CPU time and geometric quality to achieve this. Single SD files or a directory
 of SD files can then be processed by the `shieldings` subtool.
 
-A typical free for non-commercial use alternative to Turbomole is
-[ORCA](https://orcaforum.kofo.mpg.de/app.php/portal), which can also perform
-shielding constant calculations. The output from the shielding constant
-calculation step should be one SD file per molecule that contains all
-conformers associated with shielding constants as an SD atom property list as
-written by RDKit. Given a molecule and a list of shielding constants in the
-same order as the atoms in the molecule such a list can be written like this:
+The output from the shielding constant calculation step should be one SD file
+per molecule that contains all conformers associated with shielding constants
+as an SD atom property list as written by RDKit. Given a molecule and a list of
+shielding constants in the same order as the atoms in the molecule such a list
+can be written like this:
 ```
 from lefqm import constants
 from rdkit import Chem

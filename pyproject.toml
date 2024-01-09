@@ -4,11 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lefqm"
-version = "0.3.1"
+version = "0.3.2"
 authors = [
-    {name = "Patrick Penner"},
+    {name = "Patrick Penner", email = "patrick@ppenner.com"},
 ]
+description = "QM pipeline tools to predict 19F chemical shift"
+readme = "README.md"
 requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
    "lefshift>=0.5.0",
    "numpy>=1.23.5",
@@ -18,6 +26,10 @@ dependencies = [
 
 [project.scripts]
 lefqm = "lefqm.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/PatrickPenner/lefshift"
+Issues = "https://github.com/PatrickPenner/lefshift/issues"
 
 [tool.setuptools]
 packages = ["lefqm"]

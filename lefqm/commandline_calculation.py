@@ -453,9 +453,15 @@ def xtb_optimize_conformation(mol, conformation_index, xtb="xtb", cores=None):
             command.extend(["--parallel", str(cores)])
 
         xtb_log_path = xtb_dir / "xtb.log"
-        with open(xtb_log_path, "w", encoding="utf8") as log_file:
-            logging.debug(" ".join(command))
-            subprocess.check_call(command, cwd=xtb_dir, stdout=log_file, stderr=subprocess.STDOUT)
+        logging.debug(" ".join(command))
+        try:
+            with open(xtb_log_path, "w", encoding="utf8") as log_file:
+                subprocess.check_call(
+                    command, cwd=xtb_dir, stdout=log_file, stderr=subprocess.STDOUT
+                )
+        except subprocess.CalledProcessError:
+            logging.info(open(xtb_log_path, encoding="utf8").read())
+            raise
 
         with open(xtb_log_path, encoding="utf8") as log_file:
             lines = list(log_file.readlines())
@@ -508,7 +514,7 @@ def xtb_optimize(mol, xtb="xtb", conformation_indexes=None, cores=None):
 
 TURBOMOLE_CONTROL = """
 $atoms
-basis=def2-TZVP
+basis=def2-tzvp
 $coord file=coord
 $symmetry c1
 $eht charge={charge}
@@ -523,6 +529,61 @@ $cosmo
 $nmr dft shielding constants file=shielding
 $end
 """
+
+
+def x2t_convert_mol(mol, x2t="x2t", run_dir_path=None):
+    """Convert mol to turbomole coord input
+
+    :param mol: molecule to convert
+    :type mol: rdkit.Chem.rdchem.Mol
+    :param run_dir_path: path to the directory to run in
+    :type run_dir_path: pathlib.Path
+    :return: turbomole coord input
+    :rtype: str
+    """
+    if not shutil.which(x2t):
+        raise RuntimeError(f"Cannot find {x2t}")
+
+    tmp_dir = None
+    if run_dir_path is None:
+        tmp_dir = tempfile.TemporaryDirectory()
+        run_dir_path = Path(tmp_dir.name)
+    logging.debug("Converting mol in %s", run_dir_path)
+
+    xyz_path = run_dir_path / "input.xyz"
+    with open(xyz_path, "w", encoding="utf8") as xyz_file:
+        xyz_file.write(Chem.MolToXYZBlock(mol))
+
+    command = [x2t, str(xyz_path)]
+    logging.debug(" ".join(command))
+    return subprocess.check_output(command, cwd=run_dir_path).decode("ascii")
+
+
+def turbomole_read_isotropic_shieldings(shieldings_path):
+    """Read isotropic shieldings from turbomole shielding file
+
+    :param shieldings_path: path to the turbomole shielding file
+    :type shieldings_path: pathlib.Path
+    :return: isotropic shielding constants
+    :rtype: list[float]
+    """
+    with open(shieldings_path, encoding="utf8") as shieldings_file:
+        lines = shieldings_file.readlines()
+
+    shielding_constants = []
+    # skip header line
+    for line in lines[1:]:
+        if "$end" in line:
+            break
+        if line.strip()[0] == "#":
+            continue
+        # [NO., TYPE, MULT., ISOTROPIC, ANISOTROPIC, dD/dB-CONTRIBUTION]
+        tokens = [token.strip() for token in line.split(" ") if token.strip()]
+        atom_name = tokens[1]
+        if "*" in atom_name:
+            atom_name = atom_name.replace("*", "")
+        shielding_constants.append(float(tokens[3]))
+    return shielding_constants
 
 
 def turbomole_calculate_shieldings(
@@ -550,8 +611,6 @@ def turbomole_calculate_shieldings(
     :return: shieldings for every atom
     :rtype: list[float]
     """
-    if not shutil.which(x2t):
-        raise RuntimeError(f"Cannot find {x2t}")
     if not shutil.which(ridft):
         raise RuntimeError(f"Cannot find {ridft}")
     if not shutil.which(mpshift):
@@ -563,13 +622,7 @@ def turbomole_calculate_shieldings(
         run_dir_path = Path(tmp_dir.name)
     logging.debug("Calculating shieldings in %s", run_dir_path)
 
-    xyz_path = run_dir_path / "input.xyz"
-    with open(xyz_path, "w", encoding="utf8") as xyz_file:
-        xyz_file.write(Chem.MolToXYZBlock(mol))
-
-    command = [x2t, str(xyz_path)]
-    logging.debug(" ".join(command))
-    coord_output = subprocess.check_output(command, cwd=run_dir_path).decode("ascii")
+    coord_output = x2t_convert_mol(mol, x2t=x2t, run_dir_path=run_dir_path)
     coord_path = run_dir_path / "coord"
     with open(coord_path, "w", encoding="utf8") as coord_file:
         coord_file.write(coord_output)
@@ -616,25 +669,8 @@ def turbomole_calculate_shieldings(
             logging.debug("\n".join(lines))
             raise RuntimeError("mpshift calculation did not converge")
 
-    with open(run_dir_path / "shielding", encoding="utf8") as shieldings_file:
-        lines = shieldings_file.readlines()
-
-    shielding_constants = []
-    # skip header line
-    for line in lines[1:]:
-        if "$end" in line:
-            break
-        if line.strip()[0] == "#":
-            continue
-        # [NO., TYPE, MULT., ISOTROPIC, ANISOTROPIC, dD/dB-CONTRIBUTION]
-        tokens = [token.strip() for token in line.split(" ") if token.strip()]
-        atom_name = tokens[1]
-        if "*" in atom_name:
-            atom_name = atom_name.replace("*", "")
-        assert (
-            mol.GetAtomWithIdx(int(tokens[0]) - 1).GetSymbol().lower() == atom_name
-        ), "Order of atoms must be the same"
-        shielding_constants.append(float(tokens[3]))
+    shieldings_path = run_dir_path / "shielding"
+    shielding_constants = turbomole_read_isotropic_shieldings(shieldings_path)
 
     if tmp_dir is not None:
         tmp_dir.cleanup()
@@ -670,7 +706,7 @@ def nwchem_read_isotropic_shieldings(log_path):
     """Read isotropic shielding from nwchem log file
 
     :param log_path: path to the nwchem log file
-    :type log_apth: pathlib.Path
+    :type log_path: pathlib.Path
     :return: isotropic shielding constants
     :rtype: list[float]
     """
@@ -726,8 +762,14 @@ def nwchem_calculate_shieldings(mol, nwchem="nwchem", run_dir_path=None):
     args = [nwchem, input_name]
     logging.debug(" ".join(args))
     log_path = run_dir_path / "shielding.log"
-    with open(log_path, "w", encoding="utf8") as log_file:
-        subprocess.check_call(args, stderr=subprocess.STDOUT, stdout=log_file, cwd=run_dir_path)
+    try:
+        with open(log_path, "w", encoding="utf8") as log_file:
+            subprocess.check_call(
+                args, stderr=subprocess.STDOUT, stdout=log_file, cwd=run_dir_path
+            )
+    except subprocess.CalledProcessError:
+        logging.info(open(log_path, encoding="utf8").read())
+        raise
 
     shielding_constants = nwchem_read_isotropic_shieldings(log_path)
 
@@ -811,9 +853,13 @@ def gaussian_calculate_shieldings(mol, gaussian="g16", run_dir_path=None):
 
     args = [gaussian, input_name]
     logging.debug(" ".join(args))
-    subprocess.check_call(args, cwd=run_dir_path)
-
     log_path = run_dir_path / "shielding.log"
+    try:
+        subprocess.check_call(args, cwd=run_dir_path)
+    except subprocess.CalledProcessError:
+        logging.info(open(log_path, encoding="utf8").read())
+        raise
+
     shielding_constants = gaussian_read_isotropic_shieldings(log_path)
 
     if tmp_dir is not None:

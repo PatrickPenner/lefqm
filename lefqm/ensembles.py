@@ -39,6 +39,50 @@ def add_ensembles_subparser(subparsers):
     )
 
 
+def make_output(calculated_shieldings):
+    """Make output from ensemble shieldings
+
+    :param calculated_shieldings: molecule and shielding pairs to write
+    :type calculated_shieldings: list[rdkit.Chem.rdchem.Mol, dict]
+    :return: output to write
+    :rtype: pd.DataFrame
+    """
+    lines = []
+    params = SmilesParserParams()
+    params.removeHs = False
+    for mol, shieldings in calculated_shieldings:
+        name = mol.GetProp("_Name")
+        # Prepare mapping atom indices to the way the molecule will be written
+        # as smiles. The input was SDF so the atom order will change.
+        smiles = Chem.MolToSmiles(mol)
+        canon_mol = Chem.MolFromSmiles(smiles, params)
+        atom_index_map = map_atom_indexes(mol, canon_mol)
+        for key, shielding in shieldings.items():
+            if isinstance(key, tuple):
+                if len(key) == 2:
+                    label = "CF2"
+                elif len(key) == 3:
+                    label = "CF3"
+                else:
+                    raise RuntimeError("Invalid fluorine group")
+                # pick the first atom index as a representative
+                key = key[0]
+            else:
+                label = "CF"
+
+            lines.append([name, smiles, label, atom_index_map[key], shielding])
+    return pd.DataFrame(
+        lines,
+        columns=[
+            constants.ID_COLUMN,
+            constants.SMILES_COLUMN,
+            constants.LABEL_COLUMN,
+            constants.ATOM_INDEX_COLUMN,
+            constants.SHIELDING_COLUMN,
+        ],
+    )
+
+
 def ensembles(args):
     """Process QM ensemble fluorine shielding calculations"""
     calculated_shieldings = []
@@ -82,36 +126,5 @@ def ensembles(args):
             raise RuntimeError("No shieldings")
         calculated_shieldings.append((ensemble[0], fluorine_shieldings))
 
-    lines = []
-    params = SmilesParserParams()
-    params.removeHs = False
-    for mol, shieldings in calculated_shieldings:
-        name = mol.GetProp("_Name")
-        smiles = Chem.MolToSmiles(mol)
-        canon_mol = Chem.MolFromSmiles(smiles, params)
-        atom_index_map = map_atom_indexes(mol, canon_mol)
-        for key, shielding in shieldings.items():
-            if isinstance(key, tuple):
-                if len(key) == 2:
-                    label = "CF2"
-                elif len(key) == 3:
-                    label = "CF3"
-                else:
-                    raise RuntimeError("Invalid fluorine group")
-                # pick the first atom index as a representative
-                key = key[0]
-            else:
-                label = "CF"
-
-            lines.append([name, smiles, label, atom_index_map[key], shielding])
-    output = pd.DataFrame(
-        lines,
-        columns=[
-            constants.ID_COLUMN,
-            constants.SMILES_COLUMN,
-            constants.LABEL_COLUMN,
-            constants.ATOM_INDEX_COLUMN,
-            constants.SHIELDING_COLUMN,
-        ],
-    )
+    output = make_output(calculated_shieldings)
     output.to_csv(args.output, index=False)

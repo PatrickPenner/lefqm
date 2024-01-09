@@ -116,7 +116,7 @@ class CommandlineCalculationTests(unittest.TestCase):
             )
 
     def test_nwchem_read_isotropic_shieldings(self):
-        """Read isotropic shieldings"""
+        """Read isotropic shieldings from nwchem log file"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         shieldings = nwchem_read_isotropic_shieldings("tests/data/nwchem_shielding.log")
         for index, atom in enumerate(mol.GetAtoms()):
@@ -125,6 +125,7 @@ class CommandlineCalculationTests(unittest.TestCase):
             )
 
     def test_gaussian_calculate_shieldings(self):
+        """Test shielding generation with gaussian"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         shieldings = gaussian_calculate_shieldings(mol)
         for index, atom in enumerate(mol.GetAtoms()):
@@ -134,6 +135,7 @@ class CommandlineCalculationTests(unittest.TestCase):
             )
 
     def test_gaussian_read_isotropic_shieldings(self):
+        """Read isotropic shieldings from gaussian log file"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         shieldings = gaussian_read_isotropic_shieldings("tests/data/g16_shielding.log")
         for index, atom in enumerate(mol.GetAtoms()):

@@ -680,6 +680,7 @@ def turbomole_calculate_shieldings(
 
 NWCHEM_TEMPLATE = """
 title "Shieldings"
+memory global 8 gb
 charge {charge}
 geometry units angstroms
 {xyz_string}

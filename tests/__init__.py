@@ -10,4 +10,4 @@ from .commandline_calculation_tests import (
     ShieldingCalculationTests,
 )
 
-# logging.disable(logging.CRITICAL)  # suppress noise form failure tests
+# logging.disable(logging.CRITICAL)  # suppress noise from failure tests

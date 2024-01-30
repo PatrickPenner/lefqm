@@ -26,14 +26,14 @@ def add_shieldings_subparser(subparsers):
         "--config",
         type=Path,
         help="Config file to read from",
-        default=Path(__file__).absolute().parent / "config.ini",
+        default=constants.DEFAULT_CONFIG,
     )
 
 
 def shieldings(args):
     """Shielding generation"""
-    config = utils.config_to_dict(args.config)
-    config["cores"] = args.cores
+    config = utils.get_config(args.config)
+    config["Parameters"]["cores"] = str(args.cores)
 
     writer = SDWriter(str(args.output))
     writer.SetForceV3000(True)

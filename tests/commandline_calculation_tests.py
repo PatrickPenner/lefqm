@@ -8,20 +8,14 @@ from rdkit.Chem import rdmolops, rdMolAlign, SDMolSupplier
 import numpy as np
 
 from lefqm import constants, utils
-from lefqm.commandline_calculation import (
-    moka_protonate,
-    conformator_generate,
-    omega_generate,
-    xtb_optimize_conformation,
-    xtb_optimize,
-    turbomole_calculate_shieldings,
-    nwchem_calculate_shieldings,
-    nwchem_read_isotropic_shieldings,
-    gaussian_calculate_shieldings,
-    gaussian_read_isotropic_shieldings,
-    ConformerGeneration,
-    ShieldingCalculation,
-)
+from lefqm.commandline_calculation import ConformerGeneration, ShieldingCalculation
+from lefqm.conformator import conformator_generate
+from lefqm.gaussian import gaussian_calculate_shieldings, gaussian_read_isotropic_shieldings
+from lefqm.moka import moka_protonate
+from lefqm.nwchem import nwchem_calculate_shieldings, nwchem_read_isotropic_shieldings
+from lefqm.omega import omega_generate
+from lefqm.turbomole import turbomole_calculate_shieldings
+from lefqm.xtb import xtb_optimize, xtb_optimize_conformation
 
 
 class CommandlineCalculationTests(unittest.TestCase):
@@ -151,19 +145,19 @@ class ConformerGenerationTests(unittest.TestCase):
     def test_run(self):
         """Test running conformer generation"""
         config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
-        config = utils.config_to_dict(config_path)
-        config["cores"] = 1
+        config = utils.get_config(config_path)
+        config["Parameters"]["cores"] = str(1)
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
 
-        config["confgen_method"] = "conformator"
+        config["Workflow"]["confgen_method"] = "conformator"
         mol_with_confs = ConformerGeneration(config).run(mol)
         self.assertEqual(mol_with_confs.GetNumConformers(), 159)
 
-        config["confgen_method"] = "rdkit"
+        config["Workflow"]["confgen_method"] = "rdkit"
         mol_with_confs = ConformerGeneration(config).run(mol)
         self.assertEqual(mol_with_confs.GetNumConformers(), 250)
 
-        config["confgen_method"] = "omega"
+        config["Workflow"]["confgen_method"] = "omega"
         mol_with_confs = ConformerGeneration(config).run(mol)
         self.assertEqual(mol_with_confs.GetNumConformers(), 250)
 
@@ -175,10 +169,10 @@ class ShieldingCalculationTests(unittest.TestCase):
         """Test turbomole shielidng generation"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
-        config = utils.config_to_dict(config_path)
-        config["cores"] = 1
+        config = utils.get_config(config_path)
+        config["Parameters"]["cores"] = str(1)
 
-        config["qm_method"] = "turbomole"
+        config["Workflow"]["qm_method"] = "turbomole"
         shieldings = ShieldingCalculation(config).run(mol)
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
@@ -190,10 +184,10 @@ class ShieldingCalculationTests(unittest.TestCase):
         """Test nwchem shielding generation"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
-        config = utils.config_to_dict(config_path)
-        config["cores"] = 1
+        config = utils.get_config(config_path)
+        config["Parameters"]["cores"] = str(1)
 
-        config["qm_method"] = "nwchem"
+        config["Workflow"]["qm_method"] = "nwchem"
         shieldings = ShieldingCalculation(config).run(mol)
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
@@ -205,10 +199,10 @@ class ShieldingCalculationTests(unittest.TestCase):
         """Test gaussian shielding generation"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
         config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
-        config = utils.config_to_dict(config_path)
-        config["cores"] = 1
+        config = utils.get_config(config_path)
+        config["Parameters"]["cores"] = str(1)
 
-        config["qm_method"] = "gaussian"
+        config["Workflow"]["qm_method"] = "gaussian"
         shieldings = ShieldingCalculation(config).run(mol)
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(

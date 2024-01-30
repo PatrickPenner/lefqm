@@ -13,7 +13,9 @@ from rdkit.Chem.SaltRemover import SaltRemover
 from scipy.cluster.hierarchy import fcluster, linkage
 
 from lefqm import constants, utils
-from lefqm.commandline_calculation import ConformerGeneration, moka_protonate, xtb_optimize
+from lefqm.commandline_calculation import ConformerGeneration
+from lefqm.moka import moka_protonate
+from lefqm.xtb import xtb_optimize
 
 
 def add_conformers_subparser(subparsers):
@@ -48,7 +50,7 @@ def add_conformers_subparser(subparsers):
         "--config",
         type=Path,
         help="Config file to read from",
-        default=Path(__file__).absolute().parent / "config.ini",
+        default=constants.DEFAULT_CONFIG,
     )
 
 
@@ -241,8 +243,8 @@ def rmsd_cluster(
 
 def conformers(args):
     """Generate representative conformations"""
-    config = utils.config_to_dict(args.config)
-    config["cores"] = args.cores
+    config = utils.get_config(args.config)
+    config["Parameters"]["cores"] = str(args.cores)
 
     if args.input.suffix not in {".smi", ".csv"}:
         raise RuntimeError("Input may only be a SMILES (.smi) or a CSV (.csv)")
@@ -260,11 +262,11 @@ def conformers(args):
                 mol.SetProp("_Name", smiles)
 
             mol = normalize(mol)
-            mol = moka_protonate(mol, moka=config["moka"])
+            mol = moka_protonate(mol, moka=config["Paths"]["moka"])
             mol = ConformerGeneration(config).run(mol)
 
             # optimization
-            mol, energies = xtb_optimize(mol, xtb=config["xtb"], cores=args.cores)
+            mol, energies = xtb_optimize(mol, xtb=config["Paths"]["xtb"], cores=args.cores)
 
             # RMSD clustering
             conformation_indexes = rmsd_cluster(
@@ -272,7 +274,7 @@ def conformers(args):
                 energies,
                 nof_clusters=args.ensemble_size,
                 nof_picks_cluster=1,
-                prune_threshold=float(config["conf_prune_threshold"]),
+                prune_threshold=float(config["Parameters"]["conf_prune_threshold"]),
             )
 
             writer = SDWriter(str(args.output / (mol.GetProp("_Name") + ".sdf")))

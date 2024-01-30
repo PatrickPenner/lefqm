@@ -73,8 +73,9 @@ these tools:
 The above tools are redundant and you may choose between using, for example,
 one of the three QM engines listed above. To configure which tools are supposed
 to run you must pass a config file with `--config` to each commandline call.
-The default configuration can be found in `lefqm/config.ini` and looks like
-this:
+You do not need to specify all parameters, but can only include those you want
+to change. The default configuration can be found in `lefqm/config.ini` and
+looks like this:
 
 ```ini
 [Paths]

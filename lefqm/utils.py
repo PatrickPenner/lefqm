@@ -1,7 +1,9 @@
 """QM utils"""
 import configparser
 import copy
+import io
 import itertools
+import logging
 import math
 
 import numpy as np
@@ -207,12 +209,15 @@ def get_lowest_energy_fluorine_shieldings(
     return None
 
 
-def config_to_dict(config_file_path):
-    """Read a config file into a dict"""
+def get_config(config_file_path=constants.DEFAULT_CONFIG):
+    """Read default and user-specified configuration"""
     config = configparser.ConfigParser()
-    config.read(config_file_path)
-    return {
-        **config._sections["Paths"],
-        **config._sections["Workflow"],
-        **config._sections["Parameters"],
-    }
+    config.read(constants.DEFAULT_CONFIG)
+    if config_file_path != constants.DEFAULT_CONFIG:
+        config.read(config_file_path)
+    with io.StringIO() as string_stream:
+        string_stream.write("Config:\n")
+        config.write(string_stream)
+        string_stream.seek(0)
+        logging.debug(string_stream.read())
+    return config

@@ -262,7 +262,8 @@ def conformers(args):
                 mol.SetProp("_Name", smiles)
 
             mol = normalize(mol)
-            mol = moka_protonate(mol, moka=config["Paths"]["moka"])
+            if config["Parameters"].getboolean("protonate"):
+                mol = moka_protonate(mol, moka=config["Paths"]["moka"])
             mol = ConformerGeneration(config).run(mol)
 
             # optimization

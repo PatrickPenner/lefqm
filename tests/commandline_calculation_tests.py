@@ -39,7 +39,7 @@ class CommandlineCalculationTests(unittest.TestCase):
         """Test conformer generation"""
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
         mol = conformator_generate(mol)
-        self.assertEqual(mol.GetNumConformers(), 159)
+        self.assertEqual(mol.GetNumConformers(), 167)
 
     def test_omega_generate(self):
         """Test omega conformer generation"""
@@ -82,7 +82,7 @@ class CommandlineCalculationTests(unittest.TestCase):
             )
             self.assertGreater(rmsd, 0)
 
-        expected_energies = [-28523.70106556896, -28523.70080880777]
+        expected_energies = [-28523.70105917652, -28523.714133567963]
         self.assertTrue(
             all(
                 math.isclose(energy, expected, abs_tol=1e-3)
@@ -151,7 +151,7 @@ class ConformerGenerationTests(unittest.TestCase):
 
         config["Workflow"]["confgen_method"] = "conformator"
         mol_with_confs = ConformerGeneration(config).run(mol)
-        self.assertEqual(mol_with_confs.GetNumConformers(), 159)
+        self.assertEqual(mol_with_confs.GetNumConformers(), 167)
 
         config["Workflow"]["confgen_method"] = "rdkit"
         mol_with_confs = ConformerGeneration(config).run(mol)

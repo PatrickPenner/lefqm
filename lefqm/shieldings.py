@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 from rdkit import Chem
-from rdkit.Chem import SDMolSupplier, SDWriter
+from rdkit.Chem import SDMolSupplier
 
 from lefqm import constants, utils
 from lefqm.commandline_calculation import ShieldingCalculation
@@ -35,8 +35,7 @@ def shieldings(args):
     config = utils.get_config(args.config)
     config["Parameters"]["cores"] = str(args.cores)
 
-    writer = SDWriter(str(args.output))
-    writer.SetForceV3000(True)
+    output_file = open(str(args.output), "w")
     for index, mol in enumerate(SDMolSupplier(str(args.input), removeHs=False)):
         mol_name = mol.GetProp("_Name") if mol.HasProp("_Name") else str(index)
         try:
@@ -45,7 +44,9 @@ def shieldings(args):
             for atom, shielding in zip(mol.GetAtoms(), shielding_constants):
                 atom.SetDoubleProp(constants.SHIELDING_SD_PROPERTY, shielding)
             Chem.CreateAtomDoublePropertyList(mol, constants.SHIELDING_SD_PROPERTY)
-            writer.write(mol)
+            sd_string = utils.generate_high_precision_sdmol(mol, precision=10)
+            output_file.write(sd_string)
         except Exception as exception:
             logging.warning("Molecule %s failed with error: %s", mol_name, exception)
+    output_file.close()
     logging.info("done")

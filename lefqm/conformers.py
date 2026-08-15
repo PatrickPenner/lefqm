@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from lefshift.application_utils import validate_column
 from rdkit import Chem
-from rdkit.Chem import AllChem, SDWriter, StereoSpecified, rdmolops
+from rdkit.Chem import AllChem, StereoSpecified, rdmolops
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.SaltRemover import SaltRemover
@@ -278,8 +278,7 @@ def conformers(args):
                 prune_threshold=float(config["Parameters"]["conf_prune_threshold"]),
             )
 
-            writer = SDWriter(str(args.output / (mol.GetProp("_Name") + ".sdf")))
-            writer.SetForceV3000(True)
+            output_file = open(str(args.output / (mol.GetProp("_Name") + ".sdf")), "w")
             conformation_energies = [energies[index] for index in conformation_indexes]
             boltzmann_weights = utils.get_boltzmann_weights(np.array(conformation_energies))
             for conformer_id, energy, weight in zip(
@@ -287,7 +286,8 @@ def conformers(args):
             ):
                 mol.SetProp(constants.ENERGY_SD_PROPERTY, str(energy))
                 mol.SetProp(constants.BOLTZMANN_WEIGHT_SD_PROPERTY, str(weight))
-                writer.write(mol, confId=conformer_id)
-            writer.close()
+                sd_string = utils.generate_high_precision_sdmol(mol, conformer_id=conformer_id, precision=10)
+                output_file.write(sd_string)
+            output_file.close()
         except Exception as exception:
             logging.warning("Molecule %s failed with error: %s", smiles, exception)

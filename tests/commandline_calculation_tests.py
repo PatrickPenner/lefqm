@@ -14,6 +14,7 @@ from lefqm.gaussian import gaussian_calculate_shieldings, gaussian_read_isotropi
 from lefqm.moka import moka_protonate
 from lefqm.nwchem import nwchem_calculate_shieldings, nwchem_read_isotropic_shieldings
 from lefqm.omega import omega_generate
+from lefqm.orca import orca_calculate_shieldings, orca_read_isotropic_shieldings
 from lefqm.turbomole import turbomole_calculate_shieldings
 from lefqm.xtb import xtb_optimize, xtb_optimize_conformation
 
@@ -138,6 +139,27 @@ class CommandlineCalculationTests(unittest.TestCase):
                 atom.GetDoubleProp("gaussian " + constants.SHIELDING_SD_PROPERTY),
             )
 
+    def test_orca_calculate_shieldings(self):
+        """Test shielding generation with orca"""
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        shieldings = orca_calculate_shieldings(mol)
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index],
+                atom.GetDoubleProp("orca " + constants.SHIELDING_SD_PROPERTY),
+                places=3,
+            )
+
+    def test_orca_read_isotropic_shieldings(self):
+        """Read isotropic shieldings from orca log file"""
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        shieldings = orca_read_isotropic_shieldings("tests/data/orca_shielding.log")
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index],
+                atom.GetDoubleProp("orca " + constants.SHIELDING_SD_PROPERTY),
+            )
+
 
 class ConformerGenerationTests(unittest.TestCase):
     """Conformer generation tests"""
@@ -208,4 +230,19 @@ class ShieldingCalculationTests(unittest.TestCase):
             self.assertAlmostEqual(
                 shieldings[index],
                 atom.GetDoubleProp("gaussian " + constants.SHIELDING_SD_PROPERTY),
+            )
+
+    def test_run_orca(self):
+        """Test orca shielding generation"""
+        mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+        config["Parameters"]["cores"] = str(1)
+
+        config["Workflow"]["qm_method"] = "orca"
+        shieldings = ShieldingCalculation(config).run(mol)
+        for index, atom in enumerate(mol.GetAtoms()):
+            self.assertAlmostEqual(
+                shieldings[index],
+                atom.GetDoubleProp("orca " + constants.SHIELDING_SD_PROPERTY),
             )

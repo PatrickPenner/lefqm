@@ -6,7 +6,6 @@ from rdkit.Chem import SDMolSupplier
 
 from lefqm import utils
 
-
 class UtilsTests(unittest.TestCase):
     """Test QM utils"""
 
@@ -100,3 +99,12 @@ class UtilsTests(unittest.TestCase):
         shieldings = {(16, 17, 18): 233.67539121192218, (10, 11, 12): 233.55704916283617}
         averaged_shielding = {(10, 11, 12): 233.61622018737916}
         self.assertEqual(averaged_shielding, utils.get_averaged_shielding(shieldings))
+
+    def test_write_high_precision_mol(self):
+        mols = list(SDMolSupplier("tests/data/high_precision_mol.sdf", removeHs=False))
+        self.assertEqual(len(mols), 1)
+        mol = mols[0]
+        mol_sdstring = utils.generate_high_precision_sdmol(mol, precision=10)
+        with open("tests/data/high_precision_mol.sdf") as expected_file:
+            expected_sdstring = expected_file.read()
+        self.assertEqual(mol_sdstring, expected_sdstring)

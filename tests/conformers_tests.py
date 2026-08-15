@@ -24,7 +24,7 @@ class ConformersTests(unittest.TestCase):
             Chem.MolToSmiles(mol), "O[C@@H]1CCN(c2nc3c(F)cccc3o2)C1"
         )  # Z1900496514 with stereo
 
-        mol = Chem.MolFromSmiles("O=S(=O)(C1CC1)N1CCC[C@@H]1C(F)F Z2070069886")
+        mol = Chem.MolFromSmiles("O[C@H]1C(C(C)C)CC[C@@H](C)C1 menthol")
         self.assertRaises(RuntimeError, normalize, mol)  # unassigned diastereomer
 
     def test_rmsd_cluster(self):

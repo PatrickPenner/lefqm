@@ -8,6 +8,7 @@ import math
 
 import numpy as np
 from lefshift import utils
+from rdkit import Chem
 
 from lefqm import constants
 
@@ -221,3 +222,16 @@ def get_config(config_file_path=constants.DEFAULT_CONFIG):
         string_stream.seek(0)
         logging.debug(string_stream.read())
     return config
+
+
+def generate_high_precision_sdmol(mol, precision=10, conformer_id=-1):
+    params = Chem.MolWriterParams()
+    params.forceV3000 = True
+    params.precision = precision
+
+    mol_block = Chem.MolToMolBlock(mol, params=params, confId=conformer_id)
+
+    sdf_props = ""
+    for key, value in mol.GetPropsAsDict().items():
+        sdf_props += f"> <{key}>\n{value}\n\n"
+    return mol_block + sdf_props + "$$$$\n"

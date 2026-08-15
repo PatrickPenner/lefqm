@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from rdkit import Chem
 from rdkit.Chem import rdmolops
 
 ORCA_TEMPLATE = """
@@ -24,8 +25,6 @@ end
 SHIELDING_PATTERN = re.compile(r"^\s*(\d+)\s+([A-Za-z]+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)")
 
 ORCA_SUCCESS_MARKER = "****ORCA TERMINATED NORMALLY****"
-
-DEFAULT_ORCA_BINARY = "/usr/local/bin/orca_6_1_1_linux_x86-64_shared_openmpi418/orca"
 
 
 def orca_read_isotropic_shieldings(log_path):
@@ -69,19 +68,7 @@ def _orca_environment(orca):
     return environment
 
 
-def _xyz_string(mol):
-    """XYZ block with 10 decimal precision in input atom order"""
-    conformer = mol.GetConformer()
-    lines = []
-    for atom in mol.GetAtoms():
-        position = conformer.GetAtomPosition(atom.GetIdx())
-        lines.append(
-            f"{atom.GetSymbol()} {position.x:.10f} {position.y:.10f} {position.z:.10f}"
-        )
-    return "\n".join(lines)
-
-
-def orca_calculate_shieldings(mol, orca=DEFAULT_ORCA_BINARY, cores=None, run_dir_path=None):
+def orca_calculate_shieldings(mol, orca="orca", cores=None, run_dir_path=None, precision=10):
     """Calculate orca shieldings for a molecule
 
     :param mol: molecule to calculate shieldings for
@@ -92,6 +79,8 @@ def orca_calculate_shieldings(mol, orca=DEFAULT_ORCA_BINARY, cores=None, run_dir
     :type cores: int
     :param run_dir_path: path to the directory to run in
     :type run_dir_path: pathlib.Path
+    :param precision: coordinate precision for the input molecule
+    :type precision: int
     :return: shieldings for every atom
     :rtype: list[float]
     """
@@ -105,7 +94,7 @@ def orca_calculate_shieldings(mol, orca=DEFAULT_ORCA_BINARY, cores=None, run_dir
     logging.debug("Calculating shieldings in %s", run_dir_path)
 
     try:
-        xyz_string = _xyz_string(mol)
+        xyz_string = "\n".join(Chem.MolToXYZBlock(mol, precision=precision).split("\n")[2:]).strip()
         pal_block = f"%pal\n   nprocs {cores}\nend\n" if cores is not None else ""
         input_string = ORCA_TEMPLATE.format(
             charge=rdmolops.GetFormalCharge(mol),

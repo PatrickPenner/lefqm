@@ -62,7 +62,7 @@ def nwchem_read_isotropic_shieldings(log_path):
     return isotropic_shielding_constants
 
 
-def nwchem_calculate_shieldings(mol, nwchem="nwchem", run_dir_path=None):
+def nwchem_calculate_shieldings(mol, nwchem="nwchem", run_dir_path=None, precision=10):
     """Calculate nwchem shieldings for a molecule
 
     :param mol: molecule to calculate shieldings for
@@ -71,6 +71,8 @@ def nwchem_calculate_shieldings(mol, nwchem="nwchem", run_dir_path=None):
     :type nwchem: str
     :param run_dir_path: path to the directory to run in
     :type run_dir_path: pathlib.Path
+    :param precision: coordinate precision for the input molecule
+    :type precision: int
     :return: shieldings for every atom
     :rtype: list[float]
     """
@@ -83,7 +85,7 @@ def nwchem_calculate_shieldings(mol, nwchem="nwchem", run_dir_path=None):
         run_dir_path = Path(tmp_dir.name)
     logging.debug("Calculating shieldings in %s", run_dir_path)
 
-    xyz_string = "\n".join(Chem.MolToXYZBlock(mol).split("\n")[2:]).strip()
+    xyz_string = "\n".join(Chem.MolToXYZBlock(mol, precision=precision).split("\n")[2:]).strip()
     input_string = NWCHEM_TEMPLATE.format(
         charge=rdmolops.GetFormalCharge(mol), xyz_string=xyz_string
     )

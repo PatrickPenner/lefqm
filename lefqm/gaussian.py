@@ -50,7 +50,7 @@ def gaussian_read_isotropic_shieldings(log_path):
     return isotropic_shielding_constants
 
 
-def gaussian_calculate_shieldings(mol, gaussian="g16", run_dir_path=None):
+def gaussian_calculate_shieldings(mol, gaussian="g16", run_dir_path=None, precision=10):
     """Calculate gaussian shieldings for a molecule
 
     :param mol: molecule to calculate shieldings for
@@ -59,6 +59,8 @@ def gaussian_calculate_shieldings(mol, gaussian="g16", run_dir_path=None):
     :type gaussian: str
     :param run_dir_path: path to the directory to run in
     :type run_dir_path: pathlib.Path
+    :param precision: coordinate precision for the input molecule
+    :type precision: int
     :return: shieldings for every atom
     :rtype: list[float]
     """
@@ -71,7 +73,7 @@ def gaussian_calculate_shieldings(mol, gaussian="g16", run_dir_path=None):
         run_dir_path = Path(tmp_dir.name)
     logging.debug("Calculating shieldings in %s", run_dir_path)
 
-    xyz_string = "\n".join(Chem.MolToXYZBlock(mol).split("\n")[2:]).strip()
+    xyz_string = "\n".join(Chem.MolToXYZBlock(mol, precision=precision).split("\n")[2:]).strip()
     input_string = GAUSSIAN_TEMPLATE.format(
         charge=rdmolops.GetFormalCharge(mol), xyz_string=xyz_string
     )

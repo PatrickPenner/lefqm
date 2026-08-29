@@ -27,13 +27,15 @@ $end
 """
 
 
-def x2t_convert_mol(mol, x2t="x2t", run_dir_path=None):
+def x2t_convert_mol(mol, x2t="x2t", run_dir_path=None, precision=10):
     """Convert mol to turbomole coord input
 
     :param mol: molecule to convert
     :type mol: rdkit.Chem.rdchem.Mol
     :param run_dir_path: path to the directory to run in
     :type run_dir_path: pathlib.Path
+    :param precision: coordinate precision for the input molecule
+    :type precision: int
     :return: turbomole coord input
     :rtype: str
     """
@@ -48,7 +50,7 @@ def x2t_convert_mol(mol, x2t="x2t", run_dir_path=None):
 
     xyz_path = run_dir_path / "input.xyz"
     with open(xyz_path, "w", encoding="utf8") as xyz_file:
-        xyz_file.write(Chem.MolToXYZBlock(mol))
+        xyz_file.write(Chem.MolToXYZBlock(mol, precision=precision))
 
     command = [x2t, str(xyz_path)]
     logging.debug(" ".join(command))

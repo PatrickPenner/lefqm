@@ -8,6 +8,7 @@ from rdkit.Chem import AllChem
 from lefqm.conformator import conformator_generate
 from lefqm.gaussian import gaussian_calculate_shieldings
 from lefqm.nwchem import nwchem_calculate_shieldings
+from lefqm.orca import orca_calculate_shieldings
 from lefqm.omega import omega_generate
 from lefqm.turbomole import turbomole_calculate_shieldings
 
@@ -104,6 +105,13 @@ class ShieldingCalculation(CommandlineCalculation):
             return gaussian_calculate_shieldings(
                 mol,
                 gaussian=self.config["Paths"]["gaussian"],
+                run_dir_path=self.run_dir_path,
+            )
+        if self.config["Workflow"]["qm_method"] == "orca":
+            return orca_calculate_shieldings(
+                mol,
+                orca=self.config["Paths"]["orca"],
+                cores=self.config["Parameters"]["cores"],
                 run_dir_path=self.run_dir_path,
             )
         raise RuntimeError("Invalid QM method")

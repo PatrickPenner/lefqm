@@ -11,7 +11,7 @@ from rdkit import Chem
 from rdkit.Chem import rdmolops
 
 ORCA_TEMPLATE = """
-! DFT DEF2-SVP CPCM(water) NMR
+! DFT DEF2-TZVP CPCM(water) NMR
 %method
    Functional gga_xc_kt3
 end

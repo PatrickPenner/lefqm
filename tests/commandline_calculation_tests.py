@@ -24,37 +24,51 @@ class CommandlineCalculationTests(unittest.TestCase):
 
     def test_moka_protonate(self):
         """Test tautomer/protomer generation"""
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+
         mol = Chem.MolFromSmiles("O=S(=O)(C1CC1)N1CCC[C@@H]1C(F)F Z2070069886")
-        mol = moka_protonate(mol)
+        mol = moka_protonate(mol, moka=config["Paths"]["moka"])
         self.assertEqual(rdmolops.GetFormalCharge(mol), 0)
 
         mol = Chem.MolFromSmiles("C1CN(C[C@H]1N)S(c1ccc(cc1)C(F)(F)F)(=O)=O Z1480871269")
-        mol = moka_protonate(mol)
+        mol = moka_protonate(mol, moka=config["Paths"]["moka"])
         self.assertEqual(rdmolops.GetFormalCharge(mol), 1)
 
         mol = Chem.MolFromSmiles("Cc1cc(C(NC2(CC2)C(O)=O)=O)c(cc1F)[Cl] Z1603608423")
-        mol = moka_protonate(mol)
+        mol = moka_protonate(mol, moka=config["Paths"]["moka"])
         self.assertEqual(rdmolops.GetFormalCharge(mol), -1)
 
     def test_conformator_generate(self):
         """Test conformer generation"""
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
-        mol = conformator_generate(mol)
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+
+        mol = conformator_generate(mol, conformator=config["Paths"]["conformator"])
         self.assertEqual(mol.GetNumConformers(), 167)
 
     def test_omega_generate(self):
         """Test omega conformer generation"""
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
-        mol = omega_generate(mol)
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+
+        mol = omega_generate(mol, omega=config["Paths"]["omega"])
         self.assertEqual(mol.GetNumConformers(), 250)
 
     def test_xtb_optimize_conformation(self):
         """Test optimizing a single conformation"""
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
         mol = conformator_generate(mol)
         for i in range(1, mol.GetNumConformers()):
             mol.RemoveConformer(i)
-        optimized_conformation, energy = xtb_optimize_conformation(mol, 0, cores=1)
+        optimized_conformation, energy = xtb_optimize_conformation(
+            mol, 0, xtb=config["Paths"]["xtb"], cores=1
+        )
         mol.AddConformer(optimized_conformation, assignId=True)
 
         # direct atom index mapping rmsd
@@ -66,11 +80,14 @@ class CommandlineCalculationTests(unittest.TestCase):
 
     def test_xtb_optimize(self):
         """Test optimization by XTB"""
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+
         mol = Chem.MolFromSmiles("C1CC1NC(c1ccc(CO)c(c1)F)=O Z1915979114")
-        mol = conformator_generate(mol)
+        mol = conformator_generate(mol, conformator=config["Paths"]["conformator"])
         conformation_indexes = [0, 1]
         optimized_mol, energies = xtb_optimize(
-            mol, conformation_indexes=conformation_indexes, cores=1
+            mol, conformation_indexes=conformation_indexes, cores=1, xtb=config["Paths"]["xtb"]
         )
 
         self.assertEqual(optimized_mol.GetNumConformers(), len(conformation_indexes))
@@ -93,8 +110,17 @@ class CommandlineCalculationTests(unittest.TestCase):
 
     def test_turbomole_calculate_shieldings(self):
         """Test shielding generation with turbomole"""
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
-        shieldings = turbomole_calculate_shieldings(mol, cores=1)
+        shieldings = turbomole_calculate_shieldings(
+            mol,
+            x2t=config["Paths"]["x2t"],
+            ridft=config["Paths"]["ridft"],
+            mpshift=config["Paths"]["mpshift"],
+            cores=1
+        )
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
                 shieldings[index],
@@ -121,8 +147,11 @@ class CommandlineCalculationTests(unittest.TestCase):
 
     def test_gaussian_calculate_shieldings(self):
         """Test shielding generation with gaussian"""
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
+
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
-        shieldings = gaussian_calculate_shieldings(mol)
+        shieldings = gaussian_calculate_shieldings(mol, gaussian=config["Paths"]["gaussian"])
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
                 shieldings[index],
@@ -141,8 +170,10 @@ class CommandlineCalculationTests(unittest.TestCase):
 
     def test_orca_calculate_shieldings(self):
         """Test shielding generation with orca"""
+        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config = utils.get_config(config_path)
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
-        shieldings = orca_calculate_shieldings(mol)
+        shieldings = orca_calculate_shieldings(mol, orca=config["Paths"]["orca"])
         for index, atom in enumerate(mol.GetAtoms()):
             self.assertAlmostEqual(
                 shieldings[index],
@@ -235,7 +266,7 @@ class ShieldingCalculationTests(unittest.TestCase):
     def test_run_orca(self):
         """Test orca shielding generation"""
         mol = list(SDMolSupplier("tests/data/TFA_shieldings.sdf", removeHs=False))[0]
-        config_path = Path(__file__).absolute().parent.parent / "lefqm" / "config.ini"
+        config_path = Path(__file__).absolute().parent.parent /  "config.ini"
         config = utils.get_config(config_path)
         config["Parameters"]["cores"] = str(1)
 
